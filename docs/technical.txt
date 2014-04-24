@@ -14,6 +14,7 @@ a Spectrum loader and getting confused, and then finding the Spectrum ROM
 disassembly book in the library, I then ported the Spectrum saving code to the
 CPC. Sadly, I've long since lost this code, but the interest in tapes remained!
 
+
 Background - understanding a normal loader
 ------------------------------------------
 
@@ -27,17 +28,17 @@ Essentially, I'll briefly describe it now, which might help understand the
 disassembly.
 
 LD-BREAK (056B)
-	LD-EDGE-1 is called, this times out when B reaches $FF, but that is
+	LD-EDGE-1 is called, this times out when B reaches #FF, but that is
 	unimportant for now. If it timed out, it keeps looping unless space is
 	pressed.
 LD-WAIT (0574)
 	If a pulse was detected, it pauses for a second and checks again.
 LD-LEADER (0580)
 	LD-EDGE-2 is called to detect a pair of pulses, starting with a timing
-	constant of $9C. This function increases B each time round the loop and
-	when this increases past $FF to $00, it times out. If the time after
-	two pulses is between $C6 and $FF, it is considered to be "long enough"
-	for a pilot tone, below $C6 it is too short, and above $FF as we saw
+	constant of #9C. This function increases B each time round the loop and
+	when this increases past #FF to #00, it times out. If the time after
+	two pulses is between #C6 and #FF, it is considered to be "long enough"
+	for a pilot tone, below #C6 it is too short, and above #FF as we saw
 	above, it will time out.
 	These pairs of pulses are counted with H, this starts at 0 from after
 	the LD-WAIT loop, and when H wraps back round to 0, we have therefore
@@ -45,14 +46,14 @@ LD-LEADER (0580)
 LD-SYNC (058F)
 	LD-EDGE-1 is called with a timing constant about half that of 2 pulses,
 	and this is explained as we're just looking at single pulses this time.
-	Between $D4 and $FF, it is still long enough for a pilot pulse, so we
+	Between #D4 and #FF, it is still long enough for a pilot pulse, so we
 	keep looping. However, we're really looking for a short pulse with a
-	time of between $C9 and $D4 and if we find this, we call LD-EDGE-1
+	time of between #C9 and #D4 and if we find this, we call LD-EDGE-1
 	again to check for another short pulse within the remaining time.
 
 
 LD-MARKER (05C8)
-	L is initialised to $01, which is used to shift in 8 bits of data.
+	L is initialised to #01, which is used to shift in 8 bits of data.
 	Every time a new bit is shifted into L, a 0 falls out until the 8th
 	bit when a 1 will fall out.
 LD-8-BITS (05CA)
@@ -84,6 +85,7 @@ derived from the pilot tones so that any speed (within reason) can be used
 which improves performance with stretched tapes, the CRC is more complicated
 and calculated on every block of 256 bytes so an error is detected earlier,
 but essentially it's a very similar endoing system.
+
 
 Background - other tape formats
 -------------------------------
@@ -123,6 +125,7 @@ a 0 bit was represented by a short then a long pulse and a 1 bit was
 represented by a long and a short pulse. Again, a feature of this system is
 that each bit is a constant length.
 
+
 Background - some terminology
 -----------------------------
 
@@ -152,6 +155,7 @@ line coding
 
 This is a catch all phrase that describes the mappings from groups of symbols
 to characters and many such systems exist.
+
 
 Background - disk encoding
 --------------------------
@@ -228,4 +232,442 @@ per 1.5 transitions on average.
 With tape, however, there are more things to be concerned about than just
 transitions. The low and high signals decribed originally aren't really zero
 and non-zero voltages, they're actually positive and negative voltages that
-directly reflect the magnetic charge on the tape.
+directly reflect the magnetic charge on the tape. Over time, the average charge
+needs to be zero. If this rule isn't adhered to, the head will become charged
+and so the head will be less responsive one way and more the other. So, after
+a long run of +ve charge, the head will be slightly +vely charged and so a
+full +ve charge will register as a smaller +ve voltage and a full -ve charge
+will register as a larger -ve voltage. This phenomena is known as the DC bias,
+but fortunately is easy to deal with - we just ensure that for a given encoding
+the length of time the charge is +ve matches the time the charge is -ve.
+
+My initial investigations focused on just this rule, however, the volume level
+problem I described above also means that it's simpler just to stick to pairs
+of pulses which necessarily means that the DC bias is zero.
+
+
+My approach
+-----------
+
+My next investigations revolved around looking at RLL rules. Rather than 
+just having long and short pulses, I experimented with short, medium and long
+pulses. With just long and short, on average you get 1 bit of data for every
+1.5 time periods, with short, medium and long, you get 1 trit of data for every
+2 time periods. After an average of 6 time periods, you get 3*3*3 (27) possible
+combinations compared to 2*2*2*2 (16) possible combinations with the normal
+encoding. Initial tests with a MP3-tape adapter proved very positive, however,
+when I tried recording onto a real tape, I discovered that the time for the
+pulse edges made this too unreliable - occasionally medium length pulses would
+be detected as long pulses or short pulses.
+
+This inspired me to my next idea - why not INCREASE the difference between a
+short and long pulse? By increasing the ratio of the timings, we can actually
+speed up the signal, but keep the same average transition rate. However, a 0
+bit is now shorter but can still be reliably detected. Obviously, a 1 bit is
+now longer, so on average we haven't gained anything...
+                                                ...at least at first glance. :)
+
+But think back to the RLL rules we were talking about before. They're all about
+encoding the data to avoid long runs of certain bits (in this case 1s) and to
+prefer others (in this case 0s).
+
+By considering short pulses and long pulses that are 3 times longer, we can
+think about encoding into a fixed time period, e.g. 8 time periods could encode
+9 possible combinations (3 ones are represented by 1..):
+
+	0 0000000
+	1 00001..
+	2 0001..0
+	3 001..00
+	4 01..000
+	5 01..1..
+	6 1..0000
+	7 1..01..
+	8 1..1..0
+
+If you look closely, you'll see that we had flexibility on placing the first
+1.. sequence, but after the first has been placed, it makes it harder to place
+others. If you add an extra time period, the range grows more:
+
+	0  00000000
+	1  000001..
+	2  00001..0
+	3  0001..00
+	4  001..000
+	5  001..1..
+	6  01..0000
+	7  01..01..
+	8  01..1..0
+	9  1..00000
+	10 1..001..
+	11 1..01..0
+	12 1..1..00
+
+It turns out that in 16 time periods there are 277 possible codes that can
+be encoded. After experimenting, I found this system was very reliable and
+so it became the basis for the new loader. In actual practice, the division
+between short and long pulses can still be midway between them, however unlike
+a standard loader, the data on tape has the pulse length ratio 1:3 instead of
+1:2.
+
+
+Decoding the data
+-----------------
+
+Once we know the time between a pair of pulses, we can obtain a 0 or 1 bit.
+
+With the standard loader, this is simply shifted into the byte until we have
+8 bits.
+
+With my encoding system, ironically the constant time therefore decodes to a
+variable decoded bit length. Fortunately, with a 0 or 1 bit produced after
+each pulse, we can easily use a binary tree to decode the data. Also, it's
+very easy to create this binary tree at runtime, which in fact we do.
+
+If you also look at the data, in some cases (e.g. 2,3,8,11,12 above) we have
+one or two trailing 0 bits that can't possibly be any other value. The binary
+tree can stop early such that these bits aren't emitted, so actually the code
+lengths are 14-16 time periods, for an average of 15, a saving of 6%.
+
+Of the output codes, 0-255 are used as literal bytes, 256-276 are "spare", so
+these are actually used to represent control codes that introduce compressed
+sequences.
+
+
+Compressed sequences
+--------------------
+
+I haven't been too original on this front, simply because some excellent work
+was done in the 70s on compression, and this still forms the basis of most
+compression systems still in use today. The best known of these is LZW in GIF
+files and a variant of LZ77 called DEFLATE which forms the basis of gzip, 
+however all of these are ultimately built upon a simpler variant called LZ77.
+
+The basis of this encoding system is essentially a choice between a literal
+byte or an instruction to copy some preceeding data (D,L) where D is the
+distance from where the data can be found from the current position and L is
+the length of the data to copy.
+
+Now, it's quite wasteful to just encode D and L as 16-bit values, but equally
+if D was limited to 8-bits we would severely limit the efficiency of
+compression as there'd be less data to consider for copying. Many systems
+will use variable length encoding, e.g. 9 bits starting with 0 could be a
+literal, a 10 prefix might indicate a 3 bit length and 8 bit offset, and 1100,
+1101, 1110 and 1111 prefixes for less likely combinations. All of these though
+require shifting bits through a register to parse these sequences.
+
+Remember back to the previous section, where output codes 256-276 are spare.
+These are used as simple prefixes, so for instance a 5 byte copy can be
+encoded as a single symbol that represents "5 bytes and 8-bit offset" and
+another symbol for the offset.
+
+The list of these special symbols are:
+	ofs8	ofs16	note
+	256	257	implied repeat of 3
+	258	259	implied repeat of 4
+	260	261	implied repeat of 5
+	262	263	implied repeat of 6
+	264	265	implied repeat of 7
+	266	267	implied repeat of 8
+	268	269	implied repeat of 9
+	270	271	implied repeat of 10
+	272	274	specified 8-bit repeat count
+273			implied offset of -1, specified 8-bit repeat count
+	275	276	skip bytes
+
+So, for instance the symbols: 'A',273,2,'B',258,-4 produces "AAABAAAB"
+
+This indicates a special trick - if the offset is nearer than the repeat count,
+then part of the copy is repeated itself.
+
+
+Implementation
+--------------
+
+From the start, this tape loader was designed to be integrated with other code
+so that interesting things can happen during loading. By necessity, the tape
+sampling needs to happen very frequently, so if other things are being done as
+well the code needs to be very efficient.
+
+The most important thing in this loader is the main loop. At the minimum, this
+code needs to read the tape, check if a pulse has occurred, count the time
+since the last pulse and process the pulse when detected. After a lot of
+experimentation, I got it down to this:
+
+mainloop:			;	L0+ 0
+	ex af,af'		;1	L0+ 1
+mainloop_1:
+	exx			;1	L0+ 2
+	in a,(c)		;4	L0+ 6
+	xor c			;1	L0+ 7     ; check for edge
+	call m,new_found_edge	;3/5	L0+10
+	
+	ld l,(hl)		;2	L0+12     ; update counter
+	exx			;1	L0+13
+mainloop_13:
+	ex af,af'		;1	L0+14
+
+	defs line-(16+3)
+	jp mainloop		;3	L0+17
+
+This code does a lot, so it's worth explaining in detail what's going on.
+The EXX and EX AF,AF' instructions switch to the alternate register set, so
+that the current registers are preserved. Realistically, you will always want
+the EXX, but most times it doesn't matter if AF gets corrupted.
+
+The IN / XOR / CALL combination reads the current tape bit into bit 7, checks
+it against the current bit, and if it is changed (bit 7 is now 1, so the sign
+is negative) we call into new_found_edge to process the pulse.
+
+The LD is a quick way to increment a count and also to handle timeouts etc.
+(HL) points to the next number in the sequence, and the same value if we've
+reached a time-out.
+
+In general then, we want to regularly execute the code between mainloop_1 and
+mainloop_13 and each time we enter new_found_edge, we have a pulse and L
+contains a count since the last pulse. We will examine this code in a moment.
+
+It's also apparent that the alternate set registers have special usage:
+	B=#F5 input port for tape
+	C     high bit is last tape bit read
+	HL    lookup table
+
+We will now consider the pulse function, which is entered at L0+12 as the
+call c takes 5 cycles when taken, rather than the 3 when not taken.
+
+new_found_edge:
+				;	L0+12
+        ld a,c                  ;1      L0+13
+        xor #87                 ;2      L0+15 swap between #44/#4a (#22,#a5)
+        ld c,a                  ;1      L0+16
+        add a,a                 ;1      L0+17   ; colours: pre-pilot 2a/ad, pilot 2a/ac, data 22/a5               
+
+	ld b,#7f		;2	L0+19	       
+	out (c),a		;4	L0+23	; change border colour (~L0+19)
+	ld b,#f5		;2	L0+25
+	
+	inc l			;1	L0+26	; move to transition table
+	ld a,(hl)		;2	L0+28	; peek at next value
+	sub b			;1	L0+29	; symbols start at F5 :)
+	jr c,not_a_symbol	;2/3	L0+31
+
+	defs line+0-31		;	L1+ 0
+	ld pc,iy ; jp (iy)	;2	L1+ 2	; jump to symbol handler
+            
+not_a_symbol:
+                                ;	L0+32
+	defs line+1-32          ;	L1+ 1
+	in a,(c)		;4	L1+ 5 
+	xor c			;1	L1+ 6	; check for edge
+	ret p			;2/4	L1+ 8	; back at caller at 10
+	nop            	        ;1	L1+ 9
+	jr new_found_edge     	;3	L1+12
+
+The first part with the XOR inverts the top bit of C (used to hold the last
+bit) and also some lower bits that are used for the border colour. The next
+block updates the border colour based on A (rotated so the high bit becomes
+the low bit). For normal data, this results in oscillating between values #44
+and #4a which represent the familiar blue/yellow of spectrum loaders.
+
+The next block again is some trickery relating to the lookup table. Whilst I
+said before that L was the counter, this isn't quite true. In reality, most
+entries hold L+3, so that (L%3) is the pulse count and (L/3) is the pulse
+length. The INC increases the pulse count but leaves the length alone.
+
+The LD / CP fetches the current value and checks if it's above #F5 then it's
+considered to be a symbol, otherwise we jump to not_a_symbol, where we read
+the next tape bit and return if it's unchanged and repeat if we've found
+another edge. This code looks a bit weird because it's trying to execute the
+same operations at the same cycle as before, and also so that RET P will
+return on the same cycle as the mainloop_10.
+
+If the byte in (HL) is above #F5, we process the symbol by simply jumping to
+the symbol handler in IY, and A then contains a symbol from #00 to #0A. This
+range of symbols was a hangover from when I had variable length symbols but
+it's still used to handle the timeout case (symbol #F5) against the short and
+long cases (#F6 and #F7).
+
+The final tricky part of this code is the "defs line+0-31" and "defs line+1-32"
+which is used to pad all these routines to take "line" cycles in total. This
+snippet of code above dictates the shortest loop cycle, when line=31 and this
+is used for the demo. However, during testing I used line=32 (which can easily
+meet the timing requirements to read line=31 data) and line=64 in order to spot
+places where I'd miscalculated cycle counts. By using 32 or 64, the border
+colour transition would happen at a fixed point on the video line, resulting
+in a visible vertical line that would shift if the counts were incorrectly
+calculated.
+
+The register usage is now:
+	B=#F5 input port for tape
+	C     colour and high bit of last tape bit read
+	HL    lookup table
+	IY    symbol handler
+
+I won't go into detail on the next couple of symbol handlers, but essentially
+the first one, find_sync_handler, counts long sync pulses in DE and when a
+short pulse is detected after a certain number of long pulses, it changes the
+handler to head_byte_handler. From then on, DE is used to hold the current
+pointer to the symbol decode binary tree (for some reason called new_table)
+and the jump at head_finished is patched to check_sync_byte1 so that code is
+executed on the first decoded symbol. This code stores the byte and uses the
+function continue_header_18 to repatch head_finished to process more header
+bytes. The last header byte is processed in check_crc_byte2 which verifies the
+header and sets IY to the main symbol handler data_byte_handler.
+
+data_byte_handler is fairly straightforward - for a literal byte, it is stored
+in (IX) and otherwise the decompression instruction is decoded. Apart from
+skip (which I'll explain later), these compression codes are also stored at
+(IX+0) to (IX+2) - (IX+0) is the copy count, (IX+1) and (IX+2) is the offset
+of the source data. The current IX is stored into a list for the decompressor
+to process and IX is the increased by the length so that we can continue to
+read literals in-place.
+
+The skip codes were originally intended only to skip the 48 bytes at the end
+of each screen pixel line, but they turned out to be useful for compressing
+deltas too as they could be used without destroying the first 3 bytes.
+
+The register usage is now:
+	B=#F5 input port for tape
+	C     colour and high bit of last tape bit read
+	DE    binary tree table (or pilot tone count)
+	HL    lookup table
+	IX    next byte to transfer (like the ZX code)
+	IY    symbol handler
+
+Binary tree
+-----------
+
+The binary tree is stored as a series of 3 byte entries. The first byte
+consists of 2 high bits, the next 2 bytes are 2 low bytes. Put together, they
+form a 12-bit value for each of the left and right nodes.
+
+A value of 0..255 represents a literal byte as a terminal node of the tree
+A value of 256..277 represents a decompression code as a terminal node
+A value of 512..4095 represents an address of the next entry (another branch)
+
+The addresses are padded such that the 3 byte record never crosses a 256-byte
+page boundary, so the next byte can always be obtained by INC E.
+
+An obvious consequence is that the binary tree table must be between #0200 and
+#0fff. For a 16 time period table, this occupies #0200 to #0541.
+
+CRC
+---
+
+The data is also verified with a CRC, rather than using a simple XOR like the
+ZX ROM or a complicated LFSR like the Amstrad ROM, I instead use Fletcher's 16
+checksum as used in ZIP files and described here:
+	http://en.wikipedia.org/wiki/Fletcher%27s_checksum
+
+This mod-255 variant is very easy to calculate on the CPC (assuming D=1):
+
+current_crc equ $+1
+        ld hl,#ffff             ;3      L1+28
+        add a,l                 ;1      L2+29
+        adc a,d                 ;1      L2+30
+        defs line-1-30          ;       L2- 1
+        ld l,a                  ;1      L2+ 0
+        add a,h                 ;1      L2+ 1
+        adc a,d                 ;1      L2+ 2
+        ld h,a                  ;1      L2+ 3   ; HL = updated CRC
+        ld (current_crc),hl     ;5      L2+ 8
+
+Additionally, a valid CRC results in HL=#FFFF, so it's easy to check for:
+
+        ld a,l                  ;1      L2+ 9
+        and h                   ;1      L2+10    ; A=0xff if correct sync
+        inc a                   ;1      L2+11    ; A=0 if correct sync
+
+Decompression and mainloop
+--------------------------
+
+As described above, we maintain a list of blocks to decompress, which are
+always just straight copies. By doing the literals in-place and processing
+copies in order, we never need to worry about the data being available to copy.
+
+The mainloop alluded to earlier looks likeL
+
+mainloop_1:
+	exx                     ;1      L0+ 2
+	in a,(c)		;4	L0+ 6
+	xor c			;1	L0+ 7     ; check for edge
+	call m,new_found_edge	;3/5	L0+10     ; note DE preserved as can't transition here
+	ld l,(hl)		;2	L0+12     ; update counter
+	exx                     ;1      L0+13
+
+current_read_ptr equ $+1
+        ld de, free_buffer      ;3      L0+16         
+        ld hl, (patchup_write_ptr) ;5   L0+21        
+        sbc hl,de               ;4      L0+25     ; carry was clear
+        jp z, copy_finished_28  ;3      L0+28
+        ex de,hl                ;1      L0+29
+        ld e,(hl)               ;2      L0+31
+        inc l                   ;1      L0+32
+	defs line+1-32          ;       L1+ 1
+        
+	exx                     ;1      L0+ 2
+	in a,(c)		;4	L0+ 6
+	xor c			;1	L0+ 7     ; check for edge
+	call m,new_found_edge	;3/5	L0+10     ; note DE preserved as can't transition here
+	ld l,(hl)		;2	L0+12     ; update counter
+	exx                     ;1      L0+13
+
+        ld d,(hl)               ;2      L0+15
+        inc l                   ;1      L0+16     ; DE=address of data to copy
+
+        ld (current_read_ptr),hl ;5     L0+21     ; update the read pointer
+...
+mainloop_patch equ $+1
+        jp mainloop             ;       L1+ 0
+
+So this mainloop executes whenever the tape code is idle.
+
+The text drawing code is later patched into to this mainloop_patch so that it
+too is executed whenever the system is idle. In actual practice, there is a
+lot of free time. I always planned to have more demo effects here, but I never
+got chance. This is the place to do it!
+
+Interrupts
+----------
+
+Interrupts are basically a pain with this system as they would disturb the
+tight timing. However, they're also useful to sychronise with the video
+frame so that we can change the palette or play audio once per frame.
+
+We rely on the fact that once the interrupt is raised, even if interrupts are
+disabled at the time, as long as we handle the interrupt within 32 video lines
+everything will behave normally. An interrupt can therefore be processed like
+this:
+
+	exx                     ;1      L0+ 2
+	in a,(c)		;4	L0+ 6
+	xor c			;1	L0+ 7     ; check for edge
+	call m,new_found_edge	;3/5	L0+10     ; note DE preserved as can't transition here
+	nop                     ;1      L1+11
+	nop                     ;1      L1+12
+        ei                      ;1      L1+13
+	ld l,(hl)		;2	L1+15     ; update counter
+	di                      ;1      L1+16
+	exx			;1	L1+17
+
+If an interrupt has been raised, it will execute after the LD L,(HL):
+
+intvec_palette:
+	                        ;10     L0+23   ; interrupt takes 10us
+
+Returning back looks like this:
+
+	in a,(c)		;4	L0+ 6
+	xor c			;1	L0+ 7     ; check for edge
+	call m,new_found_edge	;3/5	L0+10
+	ld l,(hl)		;2	L1+12   ; update counter
+        ret                     ;3      L1+15	; back at caller at 15
+
+The LD here represents advancing the next line's count, and the RET will return
+at L1+15, hence the 2 NOPs inserted before the EI so ensure the timing is
+correct.
+
+The default routine, intvec_palette, updates the video mode and palette once
+per frame, but it's also patched to jump to the audio player once that has
+been loaded.
+

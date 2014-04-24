@@ -1,0 +1,45 @@
+       ____                 _    _               ____                  _ 
+      | __ ) _ __ ___  __ _| | _(_)_ __   __ _  | __ )  __ _ _   _  __| |
+      |  _ \| '__/ _ \/ _` | |/ / | '_ \ / _` | |  _ \ / _` | | | |/ _` |
+      | |_) | | |  __/ (_| |   <| | | | | (_| | | |_) | (_| | |_| | (_| |
+      |____/|_|  \___|\__,_|_|\_\_|_| |_|\__, | |____/ \__,_|\__,_|\__,_|
+                                         |___/                                  
+
+A tape demo for the Amstrad CPC. Features a base transfer rate of 2688 baud
+or 336 characters per second, but also features in-place decompression so
+the actual transfer rate is often much higher in practice.
+
+It started as an experiment to use floppy disk style GCR encoding on normal
+casette tape, although several earlier attempts were unreliable on a real
+tape.
+
+The easiest way to showcase the loading speed seemed to be loading lots of
+images, each "delta" image is actually sending the entire screen, but the
+compression engine can see the previous image and avoid re-encoding the same
+sections again.
+
+The artwork was created primarily by two people - JulijanaM, who created
+"Lightkeeper" (the first sequence with the girl) and the rose, and Rexbeng
+who created "Bin Renderin", the terminator style image.
+
+This is JulijanaM's first oldskool work, and I'm sure you'll agree the results
+are fantastic! You can see the original image she created and with the rest
+of her artwork here:
+	http://www.deviantart.com/art/Light-Keeper-351661825
+
+Rexbeng is a long time CPC scener, and his sequence makes fantastic use of
+mode 0 - the 16 colour mode on the Amstrad CPC.
+
+The music (use all of the tunes!) was created by McKlain, and awesome CPC
+musician who gets some amazing noises out of the AY-8192! You can hear more
+of his work and the original non-chiptune version of Little Sailor here:
+	https://soundcloud.com/McKlain
+
+More CRTC demo releases are available here:
+	http://crtc.tv/
+
+I'll release the source code and technical details of this demo shortly...
+Keep an eye out here if you're interested:
+	http://voxel.angrysprite.com/public/tapeloader/
+
+Ralf (doz/CRTC)

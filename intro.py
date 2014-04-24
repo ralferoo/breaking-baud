@@ -182,7 +182,7 @@ def outro(cdt,writer,text_base,font_base,text_out_base):
 	t.line(0).centre("| Bin Renderin |",2)
 	t.line(1).centre("{______________}",2).line()
 	t.line().left("Art",1).right("Rexbeng",2).line()
-	t.line().left("Music",1).right("McKlain",2).line().right("[Quasar]",3)
+	t.line().left("Music",1).right("McKlain",2).line().right("[CR4SH]",3)
 
 	t.present()
 	#               "1234567890123456789012345678901234567890"
@@ -197,7 +197,7 @@ def outro(cdt,writer,text_base,font_base,text_out_base):
 	t.line(1).centre("{_________________}",2).line()
 	t.line().left("Code",1).right("Doz",2).line().right("MaV",3).line()
 	t.line().left("Font",1).right("Tunk",2).line()
-	t.line().left("Music",1).right("McKlain",2).line().right("[Remember David]",3)
+	t.line().left("Music",1).right("McKlain",2).line().right("[Seagulls]",3)
 
 
 	t.present()
@@ -207,11 +207,13 @@ def outro(cdt,writer,text_base,font_base,text_out_base):
 
 	t.line().centre("Revision",1).line().line()
 	t.credit("DFox")
+	t.credit("Styx")
 	t.credit("FRaNKy")
 	t.credit("Okkie")
 	t.credit("Moqui")
-	t.credit()
-	t.credit("All the beam team")
+	#t.credit()
+	t.credit("Charlie")
+	t.credit("The beam team")
 	t.credit("All the orgas")
 	t.credit()
 	t.line().centre("Scene friends",1).line().line()
@@ -225,6 +227,7 @@ def outro(cdt,writer,text_base,font_base,text_out_base):
 	t.credit("stavs")
 	t.credit("LNX")
 	t.credit("ne7")
+	t.credit("lft")
 	t.credit()
 	#t.credit("")
 	#t.credit("")
@@ -243,9 +246,10 @@ def outro(cdt,writer,text_base,font_base,text_out_base):
 			'Kangaroo Musique',
 			'Axelay',
 			'BSC',
-			'Jonah (Tasteful Mr) Ship',
+			'tastefulmrship', #'Jonah (Tasteful Mr) Ship',
+			'Targan',
 			'Hicks',
-			'Tom',
+			'Toms',
 			'Eliot',
 			'TotO',
 			'SyX',
@@ -253,7 +257,7 @@ def outro(cdt,writer,text_base,font_base,text_out_base):
 			'AMSDOS',
 			'Executioner',
 			'Flynn',
-			'Podatron',
+			'Prodatron',
 			'phi2x'
 			]: t.credit(i)
 	t.credit().line().centre('All at CPC Wiki',1)
@@ -263,9 +267,10 @@ def outro(cdt,writer,text_base,font_base,text_out_base):
 	t.line().centre("Parties we like",1).line().line()
 	for i in [
 			'Sundown', 'Forever', 'Evoke', 'TUM',
-			'XzentriX'
+			'XzentriX',
 			]: t.credit(i)
 	t.credit()
+	t.centre('And of course, Revision!',3).line()
 	t.line().centre("Other friends",1).line().line()
 	for i in [
 			'Megmeg',
@@ -275,7 +280,8 @@ def outro(cdt,writer,text_base,font_base,text_out_base):
 			'Tunk',
 			'Kabuto',
 			'alegend45',
-			'reenigne'
+			'reenigne',
+			'psonice'
 			]: t.credit(i)
 	t.credit()
 	for i in [
@@ -285,17 +291,15 @@ def outro(cdt,writer,text_base,font_base,text_out_base):
 			]: t.credit(i)
 	t.credit()
 	for i in [
-			'All space chicken'
+			'All cyber chicken'
 			]: t.credit(i)
 	t.credit()
 
 
 	t.present().line()
 	#               "1234567890123456789012345678901234567890"
-	t.line(5).centre("Thanks for watching!")
+	t.line(5).centre("Thanks for watching!",3)
 
-	yield None
-	return
 
 def intro():
 	i=Image.new("P", (320,200))
@@ -369,6 +373,8 @@ def intro():
 	draw.text( (16,16), "PRESENTS", fill=1, font=font)
 	yield i
 
+	yield None
+
 	# 16->48 , 60->124, 130->194
 
 	# boxes
@@ -409,12 +415,6 @@ def intro():
 				fillsquare(x-scroll,y,c)
 				grid()
 			yield i
-
-#	for y in xrange(0,7):
-#		for x in xrange(0,7):
-#			c=(x+y)%2+2
-#			fillsquare(x,y,c)
-#			yield i
 
 ##############################################################################
 

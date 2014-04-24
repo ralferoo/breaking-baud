@@ -37,7 +37,7 @@ IMG =	\
 	sequence/rose/build.done \
 	intro.py
 
-TUNES = hardstyle
+TUNES = hardstyle littlesailor cr4sh bonito seagulls
 
 MUSIC = $(patsubst %,music/%-4000.bin,$(TUNES)) \
 	$(patsubst %,music/%-5000.bin,$(TUNES))

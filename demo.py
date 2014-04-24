@@ -36,12 +36,30 @@ def half(im):
 	return im.resize( (w>>1,h) )
 
 class music_switch():
-	def __init__(self,cdt):
+	def __init__(self,cdt,player,music):
 		self.cdt=cdt
+		self.player=player
+		self.music=music
+		self.addr=None
+
+	def block(self):
+		try:
+			try:	(start,end,symbs)=next(self.player)
+			except:	(start,end,symbs)=next(self.music)
+			self.cdt.block(start,end,symbs)
+		except:
+			pass
+			#self.first()
 
 	def first(self):
-		self.addr = song_data
-		self.cdt.end_multi_block(player_base)	# start music
+		if self.addr == None:
+			for (start,end,symbs) in self.player:
+				self.cdt.block(start,end,symbs)
+			for (start,end,symbs) in self.music:
+				self.cdt.block(start,end,symbs)
+
+			self.addr = song_data
+			self.cdt.end_multi_block(player_base)	# start music
 	
 	def load(self,name):
 		if self.addr == song2_data:
@@ -71,14 +89,15 @@ def makedemo(dst,addfile,cycles_per_line):
 	cdt.gap(10)
 
 	musicplayer ="build/arkos_player-%d.bin"%(cycles_per_line) 
-	music_block_size = 90
-	play = music_switch(cdt)
+	music_block_size = 94
 
 	started = False
 	player=cdt.get_data_as_blocks(musicplayer, player_base,music_block_size)
 	music=cdt.get_data_as_blocks("music/hardstyle-4000.bin", 0x4000, music_block_size)
+	play = music_switch(cdt,player,music)
 
 	# send the intro sequence with music interleaved
+	pen=True
 	if True or not testing:
 		idx = 0
 		gen=intro()
@@ -90,28 +109,18 @@ def makedemo(dst,addfile,cycles_per_line):
 				writer.add("Intro %d"%idx,i,1000,False)
 				idx = idx+1
 			else:
-				cdt.exec_code("build/remove_pen1-%d.bin"%(cycles_per_line), applet_base)
-				writer.reset("Intro %d"%idx,next(gen))
+				if pen:
+					cdt.exec_code("build/remove_pen1-%d.bin"%(cycles_per_line), applet_base)
+					writer.reset("Intro %d"%idx,next(gen))
+					pen = False
+				else:
+					play.first()
 			
 			# interleave music
-			try:
-				try:	(start,end,symbs)=next(player)
-				except:	(start,end,symbs)=next(music)
-				cdt.block(start,end,symbs)
-			except:
-				if not started:
-					started = True
-					play.first()
+			play.block()
 	
 		# send remaining music
-		for (start,end,symbs) in player:
-			cdt.block(start,end,symbs)
-		for (start,end,symbs) in music:
-			cdt.block(start,end,symbs)
-
-		if not started:
-			started = True
-			play.first()
+		play.first()
 
 		play.load("littlesailor")
 		cdt.gap(2000)
@@ -177,21 +186,13 @@ def makedemo(dst,addfile,cycles_per_line):
 	# send the outtro sequence with music interleaved
 	if True:
 		idx = 0
-		gen=outro(cdt,writer,text_base,font_base,text_out_base)
-		for i in gen:
-			if i <> None:
-				print "Creating outro image %d"%idx
-				try: i.save("build/outro-%02d.gif"%idx)
-				except: pass
-				writer.add("Intro %d"%idx,i,1000,False)
-				idx = idx+1
-
+		outro(cdt,writer,text_base,font_base,text_out_base)
 		cdt.gap(10000)
 		play.load("silence")
 		play.play()
 		cdt.gap(1000)
 		cdt.exec_code("build/reboot-%d.bin"%(cycles_per_line), applet_base)
-			
+	
 	cdt.write(dst)
 	writer.save()
 

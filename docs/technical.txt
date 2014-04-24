@@ -1,0 +1,231 @@
+       ____                 _    _               ____                  _ 
+      | __ ) _ __ ___  __ _| | _(_)_ __   __ _  | __ )  __ _ _   _  __| |
+      |  _ \| '__/ _ \/ _` | |/ / | '_ \ / _` | |  _ \ / _` | | | |/ _` |
+      | |_) | | |  __/ (_| |   <| | | | | (_| | | |_) | (_| | |_| | (_| |
+      |____/|_|  \___|\__,_|_|\_\_|_| |_|\__, | |____/ \__,_|\__,_|\__,_|
+                                         |___/                                  
+
+Intro
+-----
+
+Breaking Baud has been about 3 years in the making. I have been interested in
+tape encoding systems for a long time - when I was a kid, after disassembling
+a Spectrum loader and getting confused, and then finding the Spectrum ROM
+disassembly book in the library, I then ported the Spectrum saving code to the
+CPC. Sadly, I've long since lost this code, but the interest in tapes remained!
+
+Background - understanding a normal loader
+------------------------------------------
+
+If you're new to tape loading, I'd strongly recommend studying the Spectrum
+ROM loading code. It's not the same technique as I use, but it's well worth
+understanding. Take a look here:
+
+	http://www.wearmouth.demon.co.uk/zx82.htm#L0556
+
+Essentially, I'll briefly describe it now, which might help understand the
+disassembly.
+
+LD-BREAK (056B)
+	LD-EDGE-1 is called, this times out when B reaches $FF, but that is
+	unimportant for now. If it timed out, it keeps looping unless space is
+	pressed.
+LD-WAIT (0574)
+	If a pulse was detected, it pauses for a second and checks again.
+LD-LEADER (0580)
+	LD-EDGE-2 is called to detect a pair of pulses, starting with a timing
+	constant of $9C. This function increases B each time round the loop and
+	when this increases past $FF to $00, it times out. If the time after
+	two pulses is between $C6 and $FF, it is considered to be "long enough"
+	for a pilot tone, below $C6 it is too short, and above $FF as we saw
+	above, it will time out.
+	These pairs of pulses are counted with H, this starts at 0 from after
+	the LD-WAIT loop, and when H wraps back round to 0, we have therefore
+	seen 512 long pulses, so we consider the pilot tone to be valid.
+LD-SYNC (058F)
+	LD-EDGE-1 is called with a timing constant about half that of 2 pulses,
+	and this is explained as we're just looking at single pulses this time.
+	Between $D4 and $FF, it is still long enough for a pilot pulse, so we
+	keep looping. However, we're really looking for a short pulse with a
+	time of between $C9 and $D4 and if we find this, we call LD-EDGE-1
+	again to check for another short pulse within the remaining time.
+
+
+LD-MARKER (05C8)
+	L is initialised to $01, which is used to shift in 8 bits of data.
+	Every time a new bit is shifted into L, a 0 falls out until the 8th
+	bit when a 1 will fall out.
+LD-8-BITS (05CA)
+	LD-EDGE-2 is called (the timing constant is either set at 05A5 for the
+	initial byte or later down in this block). We compare against the half
+	pulse length, which sets carry to 0 for a short pulse and 1 for a long
+	pulse. This is then shifted into L and we loop until all 8 bits are
+	read.
+	A very simple XOR parity is calculated, and if DE==0, we check to see
+	if the XOR parity is 0 and then exit the function. If DE<>0 we jump to
+	LD-LOOP (05A9) which checks to see if this is the first byte, and if
+	so compares it against the "sync byte", otherwise it stores the byte
+	and continues.
+
+We can therefore describe the tape format as:
+ * A pilot tone of at least 1 second PLUS 512 long cycles, then 2 short cycles
+ * A single byte of sync, consists of 8 bits of either 2 long or 2 short cycles
+ * DE bytes of data, each consist of 8 bits of either 2 long or 2 short cycles
+ * A single byte of CRC, again 8 bits of either 2 long or 2 short cycles
+
+So, we can see it's a pretty simple format. The regular Amstrad format is a
+bit more complicated, so I won't describe it in detail here, but you can take
+a look here:
+
+	http://www.cpcwiki.eu/forum/programming/callbca1-firmware-compatible-tape-loader/
+
+The main features of the Amstrad loader are that the timing constants are all
+derived from the pilot tones so that any speed (within reason) can be used
+which improves performance with stretched tapes, the CRC is more complicated
+and calculated on every block of 256 bytes so an error is detected earlier,
+but essentially it's a very similar endoing system.
+
+Background - other tape formats
+-------------------------------
+
+This system of pairs of pulses seems wasteful on the face of it - after all,
+why use 2 pulses instead of 1? The reason is for tolerance to volume levels.
+The tape input on most systems uses an op-amp with feedback to provide
+hysteresis - essentially, the voltage on the input pin during a pulse looks
+like this on the left rather than what you might expect on the right:
+       _______                       _________
+      /       \                     |         |
+     /         \                    |         |
+____/           \_____     _________|         |________
+
+The key point is that the transition isn't instant, and if the pin was
+directly connected to a digital circuit, during the transition it would
+read either 0 or 1 randomly. The opamp forces the signal to be more like
+the signal on the right.
+
+If the voltage is "just right", then a continually pulsing signal will have
+lows and highs of the same length, but if the volume is too loud, the high
+will be longer than the low and if the volume is too quiet, the low will be
+longer than the high. By counting 2 pulses, we can ignore the effects of the
+volume on the pulse lengths, and instead count the length of the full cycle
+(2 pulses).
+
+
+One thing you will have noticed from the above, is that a 0 bit will transfer
+in half the time of a 1 bit. Another older format (FM) would have 2 long pulses
+or 4 short pulses, so that each bit takes a constant time, but on fast systems
+like the CPC and Spectrum, we're mostly waiting for something to happen, so
+there is no point in doing this.
+
+
+There are other possibilities too, for example the ZX80 used a system whereby
+a 0 bit was represented by a short then a long pulse and a 1 bit was
+represented by a long and a short pulse. Again, a feature of this system is
+that each bit is a constant length.
+
+Background - some terminology
+-----------------------------
+
+There are a variety of terms, that are unfortunately often interchangeable
+despite having quite different meanings.
+
+bps & baud
+
+These seem simple and the same. However, they're subtly different. bps is bits
+per second, baud is actually technically symbols per second. In the case above
+a symbol is a pair of pulses and so the numbers are the same, however this
+is not always true.
+
+symbol & character
+
+So, armed with the above information, you might think that a symbol represents
+a single transition. And that's often true, and in the analogue world a symbol
+represents a distinct state, e.g. 64QAM has 64 possible states, and so each
+symbol transfers 6 bits of data (so here 1 baud = 6 bps). However, there are
+a variety of other encoding systems where multiple symbols are used together
+to represent a set of values, and these values are sometimes also called
+symbols, other times characters and other times words. Unfortunately, in my
+code I tend to call both transitions and groups of transitions as symbols, but
+it's easier to consider the term character.
+
+line coding
+
+This is a catch all phrase that describes the mappings from groups of symbols
+to characters and many such systems exist.
+
+Background - disk encoding
+--------------------------
+
+There has been much more progress made in recent years on disk encoding, and
+this is the primary reason why we can get so much more data on modern hard
+disks than ever before (and also, why they're more susceptible to corruption).
+
+The other thing that should be highlighted early when discussing disk formats
+is that all encoding systems are designed around transitions. We were already
+thinking like this for tapes, but when we consider a tape signal it's natural
+to think of the stream of data coming from the tape as the bits read from the
+tape port, but on a disk the transitions are the important thing, so e.g.
+	tape	00001111001100001111
+	disk	10001000101010001000
+
+The original disk formats used FM (frequency modulation), which is almost
+exactly what was described above in the tape formats section. For disk drives,
+the constant bit rate is important, so FM uses 2 time periods per bit and a 0
+bit is represented by 1 transition in that timeslice, a 1 bit by 2 transitions.
+
+As you might remember from above, a transition between states is usually not
+a clean transition but rather the signal is slow to change state. Consequently,
+there's a finite limit on the number of transitions we can make in a given
+time, which in turn limits the maximum transfer rate.
+
+I haven't explicitly stated it, but one of the drivers of the systems above is
+so that the clock signal is embedded into the data so that the reader can
+unambiguously detect a transition. However, for FM encoding that means that
+a clock bit has to be transmitted for each bit, so on average there are 1.5
+transitions per bit (possible combinations are 10, 11).
+
+With MFM encoding (modified frequency modulation), the clock bits are dependant
+on the data bits, if either of the bits surrounding the clock bit are 1, the
+clock bit is 0, if both data bits are 0, then the clock bit is 1. Consequently,
+a 0 is encoded as 10 or 00 depending on the previous bit and a 1 is always
+encoded as a 10. There are 0.75 transitions per bit on average. This actually
+means that for the same quality media, we can double the transfer rate and
+maintain the same number of transitions on the media.
+
+This type of encoding is the simplest form of RLL (run length limited), which
+is a formal way of specifying how frequent the transitions need to be.
+ FM is known as (0,1) RLL, that is there are 0-1 bits gap between transitions
+MFM is known as (1,3) RLL, that is there are 1-3 bits gap between transitions
+
+It should be noted that it's possible to get bitstreams that meet the criteria
+for the RLL specification, but that cannot be produced by normal encoding. One
+example for MFM is 100010010o01001 - the bit marked "o" should be a 1 by the
+normal encoding rules, so this kind of system is often used to synchronise
+at the start of a block (sector).
+
+GCR encoding is used on older Apple disk systems and achieves a better
+storage capacity than MFM, although slower. With GCR, 4 bits are encoded to 5,
+a so called 4b5b system, such that no more than two consecutive bits in a code
+are zero, but also no code starts or ends with two zero bits, so any two codes
+together also meets this rule. This is therefore another (0,1) RLL, except
+it's also not possible to have a code with more than eight consecutive 1s.
+
+Variations of these encodings are also used for other purposes. One common
+one is 8b10b which is used for encoding HDMI data. In this, 8 bits of data
+is encoded as 10 bits such that there can't be runs of more than six 0s or six
+1s, and that transitions are minimised (there are 2 possible encodings for
+each byte, chosen based on the previous bit transmitted).
+
+
+Background - tape encoding continued
+------------------------------------
+
+So, back to tape... I'd been considering how to achieve something like GCR
+encoding on a tape. Essentially, we're limited to a relatively slow transition
+rate, so the obvious best fix is to try to achieve better results than 1 bit
+per 1.5 transitions on average.
+
+With tape, however, there are more things to be concerned about than just
+transitions. The low and high signals decribed originally aren't really zero
+and non-zero voltages, they're actually positive and negative voltages that
+directly reflect the magnetic charge on the tape.

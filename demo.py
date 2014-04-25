@@ -82,7 +82,7 @@ def makedemo(dst,addfile,cycles_per_line):
 #		cdt.block(0xc000+i,1,[i])
 #	cdt.gap(1000)
 
-	name="build/breaking_bad-%2d.exe"%(cycles_per_line)
+	name="build/breaking_baud-%2d.exe"%(cycles_per_line)
 	#t=gmtime()
 	#cdt.loader(name,"BROKEN BAUD %04d-%02d-%02d"%(t.tm_year,t.tm_mon,t.tm_mday),0x8000,0x8000)
 	cdt.loader(name,"BREAKING BAUD",0x8000,0x8000)

@@ -776,7 +776,7 @@ If you have any questions about this, feel free to email doz:
 	baud@ranulf.net
 
 Sources available at:
-	https://github.com/ralferoo/breaking-bad
+	https://github.com/ralferoo/breaking-baud
 
 More CRTC releases at:
 	http://crtc.tv/

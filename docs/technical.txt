@@ -573,6 +573,10 @@ Therefore, a normal time period, i.e. the length of a short pulse, is defined
 to be nominally 3 "lines", or 3*31 cycles=93 cycles. A pair of pulses is
 therefore 186 cycles.
 
+In reality, though, we need to consider that pulses of length 1-5 "lines" as
+short and, 7-11 "lines" as long pulses when we consider this possible variances
+of 2 "lines" between each sampled pulse.
+
 A symbol is 14-16 time periods long, so 2604, 2790 or 2976 cycles long, on
 average we can expect 2790 cycles.
 

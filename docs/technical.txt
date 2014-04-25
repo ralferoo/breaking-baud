@@ -789,6 +789,56 @@ only takes place when the images have been changed.
 demo.py creates the demo CDT and uses intro.py for the intro and outro screens.
 
 
+Audio playback
+--------------
+
+Surprisingly, the music playback was one of the hardest part of this demo.
+If you look through the source, you'll notice evidence that there used to be
+an ay_tones buffer - a 6KB circular buffer that held about 5 seconds of audio
+data, and originally the plan was to stream audio with the same compression
+as the picture data. It was quite impressive to hear audio starting almost as
+soon as the pilot tone was over.
+
+However, it was soon apparent that the compression was nowhere near as good
+as the binary version of the arkos file. Additionally, synchronising the reads
+into the buffer and playback was complicated due the the potential for read
+errors to mess up the timing.
+
+The source in arkos_player.asm is very closely based on the original Arkos
+Tracker source, except obviously the player needs to be interleaved with the
+tape playback code. This also means that, similar to the fixed cycle count
+version of the arkos player code, the cycle accuracy is very important and
+so frequently blocks are rearranged and delays inserted so that each block
+is a multiple of 31 cycles including the 12 cycles of tape code.
+
+However, the most significant change stems from the fact that the tape code
+needs the alternate registers and both IX and IY to be intact. As the tape
+code is called very frequently, it is obviously impractical to save and restore
+these registers on entry to the tape code, so instead the playback code has
+been rewritten to only use AF,BC,DE,HL. For the pattern playback, this was
+fairly simple, however the instrument playback code made heavy use of all
+registers.
+
+Instead, the playback code has been largely rearchitected. HL points to a
+control block that describes the channel, including current pointers to
+track, instrument data and state. Finally, by including the addresses of the
+output registers in this table, we can do away with the register reordering
+that is present in the original.
+
+Another benefit of this version of the code is that a single call handles
+all the pattern maintenance for that channel, and a single call for all the
+instrumnet maintenance. This is in stark contrast to the large block of copy
+pasted code from the original player, but ultimately reduces the size of the
+code.
+
+One difference to be away of if you plan on re-using this code is that the
+channels are processed in the order 1,2,3 but 3,2,1 in the original. This
+means that when multiple channels use hardware envelopes the highest number
+takes precedence, in the original the lowest number takes precedence. The
+reason for this is simply that one of the tracks in the demo has the melody
+in channel 3 but long running bass in channel 2.
+
+
 Contact
 -------
 

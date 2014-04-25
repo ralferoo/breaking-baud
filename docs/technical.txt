@@ -371,6 +371,7 @@ The list of these special symbols are:
 	266	267	implied repeat of 8
 	268	269	implied repeat of 9
 	270	271	implied repeat of 10
+
 	272	274	specified 8-bit repeat count
 273			implied offset of -1, specified 8-bit repeat count
 	275	276	skip bytes
@@ -379,6 +380,25 @@ So, for instance the symbols: 'A',273,2,'B',258,-4 produces "AAABAAAB"
 
 This indicates a special trick - if the offset is nearer than the repeat count,
 then part of the copy is repeated itself.
+
+These special codes are actually not encoded with the values 256-276, rather
+they are rearranged so that shifting bits from the right determine the type.
+
+Bit 0 = 0 indicates a replied repeat count, in this case bit 1 determines
+whether the offset is 8-bit or 16-bit and the other bits when shifted down
+hold the literal repeat count. So, e.g. code 268 (implied repeat of 9, 8-bit
+offset) is encoded at 256+(9<<2)+(0<<1)+(0<<0) = #124
+
+Bit 0 = 1 indicates one of the last 5 codes, 
+	272 -> #101	(rpt8,ofs8)
+	274 -> #105	(rpt8,ofs16)
+	273 -> #103	(rpt8)	RLE implied offset of -1
+	275 -> #107	(skip8) SKIP skip8 bytes
+	276 -> #109	(skip16) SKIP skip16 bytes
+
+These symbols are translated into these codes when building the tree, so the
+these codes rather than the logical symbol number is used when calculating the
+CRC. They are therefore also translated in cdt.py when compressing data.
 
 
 Implementation

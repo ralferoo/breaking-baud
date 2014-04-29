@@ -192,7 +192,7 @@ With MFM encoding (modified frequency modulation), the clock bits are dependant
 on the data bits, if either of the bits surrounding the clock bit are 1, the
 clock bit is 0, if both data bits are 0, then the clock bit is 1. Consequently,
 a 0 is encoded as 10 or 00 depending on the previous bit and a 1 is always
-encoded as a 10. There are 0.75 transitions per bit on average. This actually
+encoded as a 01. There are 0.75 transitions per bit on average. This actually
 means that for the same quality media, we can double the transfer rate and
 maintain the same number of transitions on the media.
 

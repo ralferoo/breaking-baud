@@ -835,7 +835,7 @@ instrumnet maintenance. This is in stark contrast to the large block of copy
 pasted code from the original player, but ultimately reduces the size of the
 code.
 
-One difference to be away of if you plan on re-using this code is that the
+One difference to be aware of if you plan on re-using this code is that the
 channels are processed in the order 1,2,3 but 3,2,1 in the original. This
 means that when multiple channels use hardware envelopes the highest number
 takes precedence, in the original the lowest number takes precedence. The
